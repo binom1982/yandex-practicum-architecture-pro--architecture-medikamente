@@ -1,0 +1,56 @@
+@startuml DFD_Process_1_Registration
+skinparam monochrome false
+skinparam shadowing false
+skinparam defaultFontName Arial
+' left to right direction
+top to bottom direction
+' Стили для элементов DFD
+skinparam actor {
+    BackgroundColor White
+    BorderColor Black
+}
+skinparam rectangle {
+    BackgroundColor LightBlue
+    BorderColor DarkBlue
+    RoundCorner 10
+}
+skinparam database {
+    BackgroundColor LightYellow
+    BorderColor Orange
+}
+skinparam arrow {
+    Color DarkGray
+    Thickness 2
+}
+
+actor "Пациент" as Patient
+actor "Администратор (Ресепшен)" as Admin
+
+rectangle "P1.1: Сбор и первичная обработка данных пациента" as P1_1
+rectangle "P1.2: Формирование записи к специалисту" as P1_2
+
+database "DS1: Patients.xlsx\n(Список пациентов, ПДн)" as DS1
+database "DS2: Journal-Doctor-FIO.xlsx\n(Журнал записей)" as DS2
+database "DS3: Data file (JPG/PDF/Excel)\n(Скан-копии документов пациента)" as DS3
+
+Patient -down-> P1_1 : "ФИО, дата рождения, телефон, email, адрес, данные о здоровье"
+Admin -down-> P1_1 : "Инициация регистрации, ввод данных"
+P1_1 -down-> DS1 : "Сохранение ПДн (без шифрования, без аудита)"
+P1_1 -down-> DS3 : "Сохранение сканов документов"
+
+Admin -right-> P1_2 : "Выбор врача и времени"
+P1_1 -right-> P1_2 : "Передача идентификатора пациента"
+P1_2 -down-> DS2 : "Запись в журнал специалиста"
+
+note bottom of DS1
+  **Риск**: Общий доступ по AD, 
+  нет разграничения прав (RBAC), 
+  нет аудита чтений/изменений.
+end note
+
+note bottom of DS3
+  **Риск**: Хранение специальных 
+  категорий ПДн в обычных файлах 
+  без криптозащиты.
+end note
+@enduml

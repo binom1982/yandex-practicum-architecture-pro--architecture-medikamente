@@ -1,0 +1,56 @@
+@startuml DFD_Process_2_MedicalService
+skinparam monochrome false
+skinparam shadowing false
+skinparam defaultFontName Arial
+' left to right direction
+top to bottom direction
+
+skinparam actor {
+    BackgroundColor White
+    BorderColor Black
+}
+skinparam rectangle {
+    BackgroundColor LightGreen
+    BorderColor DarkGreen
+    RoundCorner 10
+}
+skinparam database {
+    BackgroundColor LightYellow
+    BorderColor Orange
+}
+skinparam arrow {
+    Color DarkGray
+    Thickness 2
+}
+
+actor "Пациент" as Patient
+actor "Врач (Специалист)" as Doctor
+actor "Медицинская лаборатория\n(Внешняя система)" as Lab
+
+rectangle "P2.1: Проведение консультации и постановка диагноза" as P2_1
+rectangle "P2.2: Регистрация и обработка результатов анализов" as P2_2
+
+database "DS4: Data file (Медицинская карта)\n(Диагнозы, заключения, JPG/PDF)" as DS4
+database "DS5: Laboratory Registry / RegistryByDate.xlsx\n(Реестр анализов за день)" as DS5
+
+Patient -down-> P2_1 : "Жалобы, анамнез (устно/письменно)"
+Doctor -down-> P2_1 : "Осмотр, формирование заключения"
+P2_1 -down-> DS4 : "Сохранение врачебной тайны и мед. записей"
+
+Lab -down-> P2_2 : "Передача результатов анализов (незащищённый канал)"
+Doctor -down-> P2_2 : "Направление на анализ"
+P2_2 -down-> DS5 : "Внесение данных в реестр Excel"
+P2_2 -right-> DS4 : "Прикрепление результатов к карте пациента"
+
+note bottom of DS4
+  **Риск**: Критическая чувствительность. 
+  Хранение врачебной тайны в файловых 
+  структурах без контроля целостности.
+end note
+
+note bottom of DS5
+  **Риск**: Массовая утечка ПДн и 
+  медицинских данных из-за отсутствия 
+  обезличивания в реестрах.
+end note
+@enduml
