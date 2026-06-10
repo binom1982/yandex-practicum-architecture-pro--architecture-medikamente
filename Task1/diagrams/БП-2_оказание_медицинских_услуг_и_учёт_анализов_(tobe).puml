@@ -1,0 +1,65 @@
+@startuml БП-2_оказание_медицинских_услуг_и_учет_анализов
+skinparam monochrome false
+skinparam shadowing false
+skinparam defaultFontName Arial
+top to bottom direction
+
+skinparam actor {
+    BackgroundColor White
+    BorderColor Black
+}
+skinparam rectangle {
+    BackgroundColor LightGreen
+    BorderColor DarkGreen
+    RoundCorner 10
+}
+skinparam database {
+    BackgroundColor LightYellow
+    BorderColor Orange
+    RoundCorner 10
+}
+skinparam arrow {
+    Color DarkGray
+    Thickness 2
+}
+skinparam note {
+    BackgroundColor White
+    BorderColor DarkGreen
+    FontColor DarkGreen
+}
+
+actor "Пациент" as Patient
+actor "Врач (Специалист)" as Doctor
+actor "Медицинская лаборатория\n(Внешняя система)" as Lab
+
+' ОРИГИНАЛЬНЫЕ НАЗВАНИЯ ПРОЦЕССОВ
+rectangle "P2.1: Проведение консультации и постановка диагноза" as P2_1
+rectangle "P2.2: Регистрация и обработка результатов анализов" as P2_2
+
+' ОРИГИНАЛЬНЫЕ НАЗВАНИЯ ХРАНИЛИЩ + АННОТАЦИИ МЕР ЗАЩИТЫ
+database "DS4: Data file (Медицинская карта)\n(Диагнозы, заключения, JPG/PDF)" as DS4
+database "DS5: Laboratory Registry / RegistryByDate.xlsx\n(Реестр анализов за день)" as DS5
+
+Patient -down-> P2_1 : "[MEDICAL_CRITICAL] Жалобы, анамнез\n🛡️ Должно использоваться: Защищенный канал передачи"
+Doctor -down-> P2_1 : "[MEDICAL_CRITICAL] Осмотр, формирование заключения\n🎭 Должно использоваться: RBAC/Маскирование чужих записей"
+P2_1 -down-> DS4 : "[MEDICAL_CRITICAL] Сохранение врачебной тайны\n📎 Должно использоваться: Sidecar .json + 🔒 Шифрование"
+
+Lab -down-> P2_2 : "[MEDICAL_CRITICAL] Передача результатов анализов\n🔒 Должно использоваться: mTLS / VPN канал"
+Doctor -down-> P2_2 : "Направление на анализ"
+P2_2 -down-> DS5 : "[PII_HIGH] Внесение данных в реестр Excel\n🎭 Должно использоваться: Обезличивание (псевдонимизация) перед аналитикой"
+P2_2 -right-> DS4 : "Прикрепление результатов к карте пациента"
+
+note bottom of DS4
+  **Мера защиты для этого потока/хранилища**: 
+  Обязательное тегирование [MEDICAL_CRITICAL]. 
+  Внедрение контроля целостности файлов (хеш-суммы) 
+  для предотвращения несанкционированных изменений.
+end note
+
+note bottom of DS5
+  **Мера защиты для этого потока/хранилища**: 
+  Принцип Data Minimization: перед использованием 
+  реестра для BI/ML данные должны проходить 
+  процедуру обезличивания (удаление ФИО).
+end note
+@enduml
