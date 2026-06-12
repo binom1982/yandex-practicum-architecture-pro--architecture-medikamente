@@ -3,89 +3,89 @@
 
 title C4 Container Diagram - Target State (MVP) with Privacy by Design
 
-' === Легенда для ревьюера ===
+' === Легенда ===
 legend right
-  | **Сокращения** | **Описание** |
-  | PDP | Policy Decision Point (Принятие решений о доступе) |
-  | PEP | Policy Enforcement Point (Применение решений: маскирование, RLS) |
-  | PII | Personally Identifiable Information (Персональные данные) |
-  | KMS | Key Management Service (Управление криптографическими ключами) |
+  | **Тип актора** | **Описание** |
+  | Person | Внутренний пользователь (сотрудник) |
+  | External Person | Внешний пользователь (пациент) |
 endlegend
 
-' === Акторы ===
-Person(patient, "Пациент", "Записывается на приём, просматривает ЛК и результаты анализов")
+' === Акторы ВСЕГДА ВНЕ System_Boundary ===
 Person(staff, "Медицинский персонал", "Врачи, ресепшен, кассиры. Используют внутренний портал")
+Person_Ext(patient, "Пациент", "Внешний пользователь. Записывается на приём через ЛК/мобильное приложение")
 
-' === Граница системы "Медикаменте" (Целевая архитектура) ===
+' === Граница системы "Медикаменте" (ВНУТРИ — только контейнеры) ===
 System_Boundary(medikamente, "Медикаменте (Целевая архитектура)") {
     
-    ' --- 1. Интеграционный слой (PEP) ---
-    Container(api_gw, "API Gateway", "Java / Envoy", "Единая точка входа (PEP). Применяет политики маскирования PII и RBAC на лету, скрывает чувствительные поля во внешних ответах")
+    ' --- Интеграционный слой (PEP) ---
+    Container(api_gw, "API Gateway", "Java / Envoy", "Точка входа (PEP). Применяет политики маскирования PII и RBAC на лету")
     
-    ' --- 2. Ядро системы и Порталы ---
-    Container(patient_portal, "Patient Portal", "React / TypeScript", "Личный кабинет пациента (веб/мобильное приложение)")
-    Container(staff_portal, "Staff Portal", "React / TypeScript", "Портал для ресепшена и врачей (CRM, журналы приёмов)")
-    Container(core_app, "Core Medical App", "Java / Spring Boot", "Бизнес-логика: запись, приёмы, договоры. Реализует паттерн Soft Delete и минимизацию данных при отзыве согласия")
-    Container(core_db, "Core Medical DB", "PostgreSQL", "Хранение ПДн и мед. карт. Использует Row-Level Security (RLS) и шифрование чувствительных столбцов (at rest)")
-    Container(payment_gateway, "Payment Gateway", "Java / Spring Boot", "Интеграция с ККМ и банками. Обеспечивает безопасную обработку платежей")
+    ' --- Порталы ---
+    Container(patient_portal, "Patient Portal", "React / TypeScript", "Личный кабинет пациента (веб/мобильное)")
+    Container(staff_portal, "Staff Portal", "React / TypeScript", "Портал для ресепшена и врачей")
+    
+    ' --- Ядро системы ---
+    Container(core_app, "Core Medical App", "Java / Spring Boot", "Бизнес-логика: записи, приёмы, договоры. Soft Delete при отзыве согласия")
+    Container(core_db, "Core Medical DB", "PostgreSQL", "Хранение ПДн и мед. карт. Row-Level Security (RLS) и шифрование столбцов")
+    Container(payment_gateway, "Payment Gateway", "Java / Spring Boot", "Интеграция с ККМ и банками")
 
-    ' --- 3. Слой управления безопасностью и комплаенсом (PDP) ---
+    ' --- Слой безопасности (PDP) ---
     Container_Boundary(security_boundary, "Слой управления безопасностью и комплаенсом") {
-        Container(security_svc, "Security & Compliance Service", "Java / Open Policy Agent (OPA)", "PDP. Хранит политики доступа (RBAC/ABAC), теги конфиденциальности и статусы согласий пациентов на обработку ПДн")
-        Container(kms, "KMS", "HashiCorp Vault", "Управление криптографическими ключами для шифрования и отложенного Crypto-Shredding")
+        Container(security_svc, "Security & Compliance Service", "Java / OPA", "PDP. Политики RBAC/ABAC, теги, согласия пациентов")
+        Container(kms, "KMS", "HashiCorp Vault", "Управление криптографическими ключами")
     }
     
-    ' --- 4. Аналитический слой (Privacy by Design) ---
+    ' --- Аналитический слой ---
     Container_Boundary(analytics_boundary, "Аналитический слой (Обезличенный)") {
-        Container(etl, "ETL / Data Masking Pipeline", "Python / Airflow", "Извлекает данные из Core DB, применяет псевдонимизацию (замена ФИО на UUID, сдвиг дат) перед загрузкой")
-        Container(analytics_db, "Secure Analytics DB", "ClickHouse", "Витрина обезличенных данных для BI и ML. Не содержит прямых идентификаторов (PII)")
+        Container(etl, "ETL Pipeline", "Python / Airflow", "Псевдонимизация данных (ФИО → UUID) перед загрузкой")
+        Container(analytics_db, "Secure Analytics DB", "ClickHouse", "Витрина обезличенных данных для BI/ML")
     }
     
-    ' --- 5. Слой управления жизненным циклом данных ---
-    Container_Boundary(retention_boundary, "Управление жизненным циклом данных") {
-        Container(retention_svc, "Retention & Archiving Service", "Java / Cron", "Переносит данные в Cold Storage по истечении срока и инициирует уничтожение ключей в KMS")
-        Container(archive_storage, "Cold Storage Archive", "S3 / Encrypted FS", "Изолированное хранилище для Legal Hold (данные, которые нельзя удалить по закону, но доступ к которым ограничен)")
+    ' --- Управление жизненным циклом ---
+    Container_Boundary(retention_boundary, "Управление жизненным циклом") {
+        Container(retention_svc, "Retention Service", "Java / Cron", "Архивация данных и отложенное Crypto-Shredding")
+        Container(archive_storage, "Cold Storage", "S3 / Encrypted FS", "Изолированное хранилище Legal Hold")
     }
 }
 
-' === Внешние системы (Legacy и партнёры из As-Is) ===
-System_Ext(lab, "Внешняя лаборатория", "Партнерская система для интеграции результатов анализов по API")
-System_Ext(accounting_1c, "1С: Бухгалтерия предприятия", "Бухгалтерский учёт, зарплаты, налоги (Legacy, файловый режим)")
-System_Ext(warehouse_1c, "1С: Торговля и склад", "Учёт ТМЦ и закупок (Legacy, файловый режим)")
-System_Ext(mail_server, "Exchange Mail Server", "Внутренняя почта и отправка уведомлений")
-System_Ext(kkm, "ККМ", "Контрольно-кассовые машины для фискализации платежей")
+' === Внешние системы (тоже ВНЕ System_Boundary) ===
+System_Ext(lab, "Внешняя лаборатория", "Партнёрская система для интеграции анализов")
+System_Ext(accounting_1c, "1С: Бухгалтерия", "Legacy, файловый режим")
+System_Ext(warehouse_1c, "1С: Торговля и склад", "Legacy, файловый режим")
+System_Ext(mail_server, "Exchange Mail Server", "Внутренняя почта")
+System_Ext(kkm, "ККМ", "Контрольно-кассовые машины")
 
-' === Взаимодействия: Акторы -> Система ===
+' === Взаимодействия: Акторы → Система ===
 Rel(patient, patient_portal, "Запись на приём, просмотр ЛК", "HTTPS")
 Rel(staff, staff_portal, "Ведение приёмов, учёт пациентов", "HTTPS")
 
-' === Взаимодействия: Порталы -> API Gateway (PEP) ===
-Rel(patient_portal, api_gw, "REST API запросы", "HTTPS / mTLS")
-Rel(staff_portal, api_gw, "REST API запросы", "HTTPS / mTLS")
+' === Порталы → API Gateway ===
+Rel(patient_portal, api_gw, "REST API", "HTTPS / mTLS")
+Rel(staff_portal, api_gw, "REST API", "HTTPS / mTLS")
 
-' === Взаимодействия: PEP <-> PDP (Безопасность) ===
-Rel(api_gw, security_svc, "Запрос политик доступа и тегов (Check Consent)", "gRPC")
-Rel(core_app, security_svc, "Проверка прав доступа при чтении/записи (RLS)", "gRPC")
+' === PEP ↔ PDP ===
+Rel(api_gw, security_svc, "Запрос политик доступа", "gRPC")
+Rel(core_app, security_svc, "Проверка прав (RLS)", "gRPC")
 
-' === Взаимодействия: Внутри ядра системы ===
-Rel(api_gw, core_app, "Проксирует запросы, применяет маскирование (PEP)", "REST")
-Rel(core_app, core_db, "Чтение/запись данных", "JDBC")
+' === Внутри ядра ===
+Rel(api_gw, core_app, "Проксирование запросов", "REST")
+Rel(core_app, core_db, "Чтение/запись", "JDBC")
 Rel(core_app, payment_gateway, "Инициация платежа", "REST")
-Rel(payment_gateway, kkm, "Фискализация платежей", "TCP/IP / OLE")
+Rel(payment_gateway, kkm, "Фискализация", "TCP/IP / OLE")
 
-' === Взаимодействия: Аналитика (Privacy by Design) ===
-Rel(core_db, etl, "Выгрузка данных для аналитики (CDC/Batch)", "Internal")
-Rel(etl, analytics_db, "Загрузка псевдонимизированных данных", "JDBC")
+' === Аналитика ===
+Rel(core_db, etl, "Выгрузка (CDC/Batch)", "Internal")
+Rel(etl, analytics_db, "Загрузка обезличенных данных", "JDBC")
 
-' === Взаимодействия: Управление жизненным циклом (Retention) ===
-Rel(core_app, retention_svc, "Триггер на архивацию (смена статуса на CONSENT_REVOKED)", "Internal API")
-Rel(retention_svc, archive_storage, "Перенос в изолированное хранилище (Legal Hold)", "S3 API")
-Rel(retention_svc, kms, "Запрос/уничтожение ключей (отложенный Crypto-Shredding)", "KMS API")
+' === Retention ===
+Rel(core_app, retention_svc, "Триггер архивации", "Internal API")
+Rel(retention_svc, archive_storage, "Перенос в Cold Storage", "S3 API")
+Rel(retention_svc, kms, "Уничтожение ключей", "KMS API")
 
-' === Взаимодействия: Внешние интеграции ===
-Rel(api_gw, lab, "Обмен результатами анализов (строгая фильтрация PII)", "REST API / mTLS")
-Rel(core_app, accounting_1c, "Передача финансовых данных для учёта", "SOAP / REST")
-Rel(core_app, warehouse_1c, "Списание ТМЦ по оказанным услугам", "SOAP / REST")
-Rel(core_app, mail_server, "Отправка уведомлений пациентам и сотрудникам", "SMTP")
+' === Внешние интеграции ===
+Rel(api_gw, lab, "Обмен анализами (фильтрация PII)", "REST / mTLS")
+Rel(core_app, accounting_1c, "Финансовые данные", "SOAP / REST")
+Rel(core_app, warehouse_1c, "Списание ТМЦ", "SOAP / REST")
+Rel(core_app, mail_server, "Уведомления", "SMTP")
 
 @enduml
