@@ -1,0 +1,38 @@
+@startuml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
+
+LAYOUT_WITH_LEGEND()
+
+Person(Analyst, "Бизнес-аналитик / Data Scientist", "Строит отчеты и ML-модели на основе Золотого источника")
+Person(DataEngineer, "Инженер данных", "Настраивает пайплайны загрузки данных из источников (1C, Excel, CRM)")
+
+System_Boundary(DWH_Boundary, "Аналитическое хранилище данных (Data Lake / DWH)") {
+    
+    Container(IngestionQueue, "Очередь сообщений (Kafka)", "Apache Kafka", "Буферизация входящих потоков сырых данных из источников")
+    
+    Container(ClassificationEngine, "Движок классификации и защиты данных", "Python/Java, Spark, NLP/Regex", "1. Профилирование схемы. 2. Поиск PII. 3. Тегирование (разметка метаданными). 4. Маскирование/Токенизация")
+    
+    ContainerDb(RawDataLayer, "Слой сырых данных", "S3 / HDFS", "Сырые данные в исходном виде. Содержат нефильтрованные PII. Доступ строго ограничен.")
+    ContainerDb(ProcessedLabeledLayer, "Слой обработанных и размеченных данных", "PostgreSQL / ClickHouse", "Очищенные данные, промаркированные тегами конфиденциальности. PII токенизированы.")
+    ContainerDb(GoldenSource, "Золотой источник (Golden Source)", "ClickHouse", "Единый надежный набор данных для BI/ML. Полностью обезличен и агрегирован.")
+    
+    ContainerDb(MetadataStore, "Хранилище метаданных и политик", "PostgreSQL", "Правила классификации, словари тегов и политики доступа (ABAC/RBAC).")
+}
+
+System_Ext(ExternalSources, "Внешние и внутренние источники", "1С, Excel, CRM, Портал пациента")
+
+Rel(DataEngineer, IngestionQueue, "Загружает пакеты данных")
+Rel(ExternalSources, IngestionQueue, "Отправляет данные", "Batch / Streaming")
+
+Rel(IngestionQueue, ClassificationEngine, "Читает сырые данные для обработки")
+Rel(ClassificationEngine, MetadataStore, "Запрашивает актуальные правила и словари тегов", "HTTPS")
+Rel(ClassificationEngine, RawDataLayer, "Сохраняет исходную копию (для аудита и Data Lineage)", "Шифрование at rest")
+Rel(ClassificationEngine, ProcessedLabeledLayer, "Сохраняет очищенные и размеченные тегами данные")
+Rel(ClassificationEngine, GoldenSource, "Формирует агрегированные обезличенные данные (если применимо)")
+
+Rel(Analyst, GoldenSource, "Читает данные для BI/ML", "Только обезличенные данные")
+Rel(Analyst, MetadataStore, "Запрашивает словарь данных и теги", "Read-only")
+
+UpdateRelStyle(ClassificationEngine, ProcessedLabeledLayer, $textColor="green", $lineColor="green", $offsetY="-20")
+UpdateRelStyle(ClassificationEngine, GoldenSource, $textColor="blue", $lineColor="blue", $offsetY="20")
+@enduml
