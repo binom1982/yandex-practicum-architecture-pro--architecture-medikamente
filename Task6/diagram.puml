@@ -25,7 +25,7 @@ Rel(DataEngineer, IngestionQueue, "Загружает пакеты данных"
 Rel(ExternalSources, IngestionQueue, "Отправляет данные", "Batch / Streaming")
 
 Rel(IngestionQueue, ClassificationEngine, "Читает сырые данные для обработки")
-Rel(ClassificationEngine, MetadataStore, "Запрашивает актуальные правила и словари тегов", "HTTPS")
+Rel(ClassificationEngine, MetadataStore, "Запрашивает актуальные правила и словари тегов")
 Rel(ClassificationEngine, RawDataLayer, "Сохраняет исходную копию (для аудита и Data Lineage)", "Шифрование at rest")
 Rel(ClassificationEngine, ProcessedLabeledLayer, "Сохраняет очищенные и размеченные тегами данные")
 Rel(ClassificationEngine, GoldenSource, "Формирует агрегированные обезличенные данные (если применимо)")
