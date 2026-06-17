@@ -1,0 +1,60 @@
+@startuml DFD_Process_3_Payments
+skinparam monochrome false
+skinparam shadowing false
+skinparam defaultFontName Arial
+' left to right direction
+top to bottom direction
+
+skinparam actor {
+    BackgroundColor White
+    BorderColor Black
+}
+skinparam rectangle {
+    BackgroundColor LightCoral
+    BorderColor DarkRed
+    RoundCorner 10
+}
+skinparam database {
+    BackgroundColor LightYellow
+    BorderColor Orange
+}
+skinparam arrow {
+    Color DarkGray
+    Thickness 2
+}
+
+actor "Пациент" as Patient
+actor "Кассир" as Cassier
+actor "Бухгалтер" as Bookkeeper
+
+rectangle "P3.1: Приём оплаты и фискализация" as P3_1
+rectangle "P3.2: Двойной учёт платежей (Ручной + Автоматический)" as P3_2
+rectangle "P3.3: Процессинг и сводный учёт" as P3_3
+
+database "DS6: ККМ\n(Фискальные данные)" as DS6
+database "DS7: Excel-файл кассира\n(Дублирующий учёт)" as DS7
+database "DS8: 1С:Бухгалтерия предприятия\n(Файловый режим)" as DS8
+
+Patient -down-> P3_1 : "Денежные средства / Карта"
+P3_1 -down-> DS6 : "Формирование чека"
+
+Cassier -down-> P3_2 : "Ручной ввод данных об оплате"
+DS6 -up-> P3_2 : "Автоматическая передача данных (TCP/IP, OLE)"
+P3_2 -down-> DS7 : "Запись в Excel (риск рассинхронизации)"
+P3_2 -right-> DS8 : "Запись в 1С:Бухгалтерия"
+
+Bookkeeper -down-> P3_3 : "Сверка, начисление ЗП, налоги"
+DS8 -up-> P3_3 : "Выгрузка данных для отчётности"
+
+note bottom of DS7
+  **Риск**: Двойной учёт создаёт 
+  несогласованность данных и 
+  дополнительную точку утечки ПДн/финансов.
+end note
+
+note bottom of DS8
+  **Риск**: Файловый режим 1С уязвим 
+  к несанкционированному копированию 
+  всей базы данных целиком.
+end note
+@enduml

@@ -1,0 +1,64 @@
+@startuml БП-1_регистрация_пациента_и_запись_на_приём
+skinparam monochrome false
+skinparam shadowing false
+skinparam defaultFontName Arial
+top to bottom direction
+
+skinparam actor {
+    BackgroundColor White
+    BorderColor Black
+}
+skinparam rectangle {
+    BackgroundColor LightBlue
+    BorderColor DarkBlue
+    RoundCorner 10
+}
+skinparam database {
+    BackgroundColor LightYellow
+    BorderColor Orange
+    RoundCorner 10
+}
+skinparam arrow {
+    Color DarkGray
+    Thickness 2
+}
+skinparam note {
+    BackgroundColor White
+    BorderColor DarkGreen
+    FontColor DarkGreen
+}
+
+actor "Пациент" as Patient
+actor "Администратор (Ресепшен)" as Admin
+
+rectangle "P1.1: Сбор и первичная обработка данных пациента" as P1_1
+rectangle "P1.2: Формирование записи к специалисту" as P1_2
+
+database "DS1: Patients.xlsx\n(Список пациентов, ПДн)" as DS1
+database "DS2: Journal-Doctor-FIO.xlsx\n(Журнал записей)" as DS2
+database "DS3: Data file (JPG/PDF/Excel)\n(Скан-копии документов пациента)" as DS3
+
+Patient -down-> P1_1 : "[PII_HIGH] ФИО, дата рождения, телефон, email, адрес, данные о здоровье\nDLP-контроль ввода"
+Admin -down-> P1_1 : "[PII_HIGH] Инициация регистрации, ввод данных\nМаскирование полей в UI"
+
+P1_1 -down-> DS1 : "[PII_HIGH] Сохранение ПДн\nSidecar .json тег + Шифрование диска"
+P1_1 -down-> DS3 : "[MEDICAL_CRITICAL] Сохранение сканов документов\nSidecar .json тег + Шифрование файла"
+
+Admin -right-> P1_2 : "Выбор врача и времени"
+P1_1 -right-> P1_2 : "Передача идентификатора пациента\nШифрование канала (mTLS)"
+P1_2 -down-> DS2 : "[PII_MEDIUM] Запись в журнал специалиста\nАудит изменений файла"
+
+note bottom of DS1
+  <<To-Be>> Меры защиты:
+  1. Автоматическое создание sidecar-файла .classification.json.
+  2. Ограничение прав доступа к папке через NTFS ACL.
+  3. Запрет на копирование файла за пределы защищенного контура.
+end note
+
+note bottom of DS3
+  <<To-Be>> Меры защиты:
+  1. Прозрачное шифрование файлов (at rest).
+  2. Настройка DLP-политики на блокировку отправки файлов 
+     с медицинскими данными по незащищенным каналам.
+end note
+@enduml

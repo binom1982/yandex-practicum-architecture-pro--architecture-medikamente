@@ -1,0 +1,68 @@
+@startuml БП-3_обработка_платежей_и_финансовый_учет
+skinparam monochrome false
+skinparam shadowing false
+skinparam defaultFontName Arial
+top to bottom direction
+
+skinparam actor {
+    BackgroundColor White
+    BorderColor Black
+}
+skinparam rectangle {
+    BackgroundColor LightCoral
+    BorderColor DarkRed
+    RoundCorner 10
+}
+skinparam database {
+    BackgroundColor LightYellow
+    BorderColor Orange
+    RoundCorner 10
+}
+skinparam arrow {
+    Color DarkGray
+    Thickness 2
+}
+skinparam note {
+    BackgroundColor White
+    BorderColor DarkGreen
+    FontColor DarkGreen
+}
+
+actor "Пациент" as Patient
+actor "Кассир" as Cassier
+actor "Бухгалтер" as Bookkeeper
+
+rectangle "P3.1: Приём оплаты и фискализация" as P3_1
+rectangle "P3.2: Двойной учёт платежей (Ручной + Автоматический)" as P3_2
+rectangle "P3.3: Процессинг и сводный учёт" as P3_3
+
+database "DS6: ККМ\n(Фискальные данные)" as DS6
+database "DS7: Excel-файл кассира\n(Дублирующий учёт)" as DS7
+database "DS8: 1С:Бухгалтерия предприятия\n(Файловый режим)" as DS8
+
+Patient -down-> P3_1 : "[FINANCE_MEDIUM] Денежные средства / Карта\nШифрование канала (TLS 1.3 для эквайринга)"
+P3_1 -down-> DS6 : "Формирование чека"
+
+Cassier -down-> P3_2 : "[FINANCE_MEDIUM] Ручной ввод данных об оплате\nОграничение видимости ПДн пациента в UI"
+DS6 -up-> P3_2 : "[FINANCE_MEDIUM] Автоматическая передача данных\nШифрование канала (замена OLE на gRPC/mTLS)"
+
+P3_2 -down-> DS7 : "[FINANCE_MEDIUM] Запись в Excel\n<<To-Be>> Устранение избыточного хранения (отказ от двойного учёта)"
+P3_2 -right-> DS8 : "[FINANCE_MEDIUM] Запись в 1С:Бухгалтерия\nМиграция на клиент-серверный режим с TDE"
+
+Bookkeeper -down-> P3_3 : "Сверка, начисление ЗП, налоги"
+DS8 -up-> P3_3 : "Выгрузка данных для отчётности\nАудит действий в СУБД"
+
+note bottom of DS7
+  <<To-Be>> Меры защиты:
+  1. Ликвидация ручного дублирования учёта в Excel.
+  2. Если файл временно сохраняется, к нему применяется 
+     sidecar-тег и строгий DLP-контроль на запись.
+end note
+
+note bottom of DS8
+  <<To-Be>> Меры защиты:
+  1. Перевод из файлового режима в клиент-серверный (PostgreSQL).
+  2. Применение прозрачного шифрования данных (TDE).
+  3. Разграничение прав доступа (RLS) на уровне базы данных.
+end note
+@enduml
